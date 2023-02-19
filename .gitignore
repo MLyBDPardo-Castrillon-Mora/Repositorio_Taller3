@@ -275,7 +275,9 @@ rsconnect/
 # R package: bookdown caching files
 /*_files/
 
-
-
+#Ignore data bases
+*.csv
+*.xls
+*.xlsx
 
 # End of https://www.toptal.com/developers/gitignore/api/r,macos,python,microsoftoffice
