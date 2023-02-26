@@ -459,9 +459,34 @@ m5_acc <- table(m5_pred, test$poor)
 # Accuracy - 74.14%
 confusionMatrix(m5_acc)
 
+# AGRUPAR HOGARES ==============================================================
+
+# Clasificador por hogares
+train_h <- train[train$parent=="1",]
+test_h <- test[test$parent=="1",]
+dev_set_h <- dev_set[dev_set$parent=="1",]
+
+model.4 <- lda(as.numeric(poor) ~ rooms + bedrooms + nper + npersug + clase
+               + sex + age + rent_rec + help + grade + prop_2 + prop_3
+               + prop_4 + prop_5 + prop_6 + health_aff_2 + health_aff_3
+               + health_aff_9 + educ_1 + educ_2 + educ_3 + educ_4 + educ_5, 
+               data = train_h)
+model.4
+model.4.pred <- predict(model.4, test_h)
+model.4.class <- model.4.pred$class
+m4_acc <- table(model.4.class, test_h$poor)
+
+# Accuracy - 82.98%
+confusionMatrix(m4_acc)
+
 
 # SUBSET SELECTION =============================================================
-sub_sel <- regsubsets(as.factor(poor)~., data = train, nvmax = 20, method="forward")
+
+sub_sel <- regsubsets(poor ~ .,
+                      data = dev_set_h,
+                      nvmax = 15,
+                      method = "forward")
+
 sum.sub_sel <- summary(sub_sel)
 
 # Metricas
