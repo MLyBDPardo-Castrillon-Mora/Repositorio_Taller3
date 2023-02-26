@@ -80,6 +80,18 @@ train$ayuda_2 <- ifelse(is.na(train$ayuda_2), 0, train$ayuda_2)
 train$rent_rec <- train$ayuda_1 + train$ayuda_2
 train <- dplyr::select(train, -ayuda_1, -ayuda_2)
 
+# Repetir para test
+test$ayuda_1 <- ifelse(is.na(test$ayuda_1), 0, test$ayuda_1)
+test$ayuda_2 <- ifelse(is.na(test$ayuda_2), 0, test$ayuda_2)
+test$rent_rec <- test$ayuda_1 + test$ayuda_2
+test <- dplyr::select(test, -ayuda_1, -ayuda_2)
+
+# Repetir para dev_set
+dev_set$ayuda_1 <- ifelse(is.na(dev_set$ayuda_1), 0, dev_set$ayuda_1)
+dev_set$ayuda_2 <- ifelse(is.na(dev_set$ayuda_2), 0, dev_set$ayuda_2)
+dev_set$rent_rec <- dev_set$ayuda_1 + dev_set$ayuda_2
+dev_set <- dplyr::select(dev_set, -ayuda_1, -ayuda_2)
+
 # Resolver NAs -----------------------------------------------------------------
 
 # Contar NAs
@@ -122,15 +134,19 @@ train$health_aff <- aux$health_aff
 # Check - Conteo de NAs
 colSums(is.na(train)) %>% as.data.frame()
 
+
 # DUMMIES  =================================================================
 
 # Definir variables categoricas
 cols_f <- c("prop", "parent", "health_aff", "educ")
 train[, cols_f] <- data.frame(apply(train[cols_f], 2, as.factor))
 test[, cols_f] <- data.frame(apply(test[cols_f], 2, as.factor))
+dev_set[, cols_f] <- data.frame(apply(dev_set[cols_f], 2, as.factor))
 
 # Crear Dummies
 train <- dummy_cols(train, select_columns = cols_f)
+test <- dummy_cols(test, select_columns = cols_f)
+dev_set <- dummy_cols(dev_set, select_columns = cols_f)
 
 
 # BALANCEO DE DATOS ============================================================
@@ -171,89 +187,281 @@ prop.table(table(smote$poor))
 
 
 # Estimacion 1.1: undersampling
-model.1 <- glm(as.numeric(pobre) ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
+model.1 <- glm(as.numeric(poor) ~ clase + sex + parent_2 + parent_3 + parent_4
                + parent_5 + parent_6 + parent_7 + parent_8 + parent_9
-               + parent_3 + rooms + bedrooms + property_2 + property_3
-               + property_4 + property_5 + property_6 + nper,
-               data = smote, family = "binomial")
+               + rooms + bedrooms + prop_2 + prop_3 + prop_4 + prop_5 + prop_6
+               + nper,
+               data = undersample, family = "binomial")
 
 sum_m1 <- summary(model.1)
 
 # Prediccion en train
-m1_probs <- predict(model.1, type = "response", newdata = test_nan)
+m1_probs <- predict(model.1, type = "response", newdata = test)
 
 # Matriz de confusion
 m1_pred <- rep(0, length(fitted(model.1)))
 m1_pred[m1_probs > 0.5] = 1
 m1_acc <- table(m1_pred, model.1$y)
 
-# Accuracy - 50.08%
+# Accuracy - 50%
 confusionMatrix(m1_acc)
 
 # Estimacion 1.2: SMOTE
-model.1 <- glm(as.numeric(pobre) ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
+model.1 <- glm(as.numeric(poor) ~ clase + sex + parent_2 + parent_3 + parent_4
                + parent_5 + parent_6 + parent_7 + parent_8 + parent_9
-               + parent_3 + rooms + bedrooms + property_2 + property_3
-               + property_4 + property_5 + property_6 + nper,
+               + rooms + bedrooms + prop_2 + prop_3 + prop_4 + prop_5 + prop_6
+               + nper,
                data = smote, family = "binomial")
 
 sum_m1 <- summary(model.1)
 
 # Prediccion en train
-m1_probs <- predict(model.1, type = "response", newdata = test_nan)
+m1_probs <- predict(model.1, type = "response", newdata = test)
 
 # Matriz de confusion
 m1_pred <- rep(0, length(fitted(model.1)))
 m1_pred[m1_probs > 0.5] = 1
 m1_acc <- table(m1_pred, model.1$y)
 
-# Accuracy - 54.84%
+# Accuracy - 54.86%
 confusionMatrix(m1_acc)
 
 # Modelo 2: Regresion Lineal (prediccion de ingreso) ---------------------------
 
 # Estimacion 2.1: undersampling
-model.2 <- lm(ingtotug ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
-               + parent_5 + parent_6 + parent_7 + parent_8 + parent_9
-               + parent_3 + rooms + bedrooms + property_2 + property_3
-               + property_4 + property_5 + property_6 + nper,
-               data = undersample)
+model.2 <- lm(ing ~ clase + sex + parent_2 + parent_3 + parent_4
+              + parent_5 + parent_6 + parent_7 + parent_8 + parent_9
+              + rooms + bedrooms + prop_2 + prop_3 + prop_4 + prop_5 + prop_6
+              + nper,
+              data = undersample)
 
 sum_m2 <- summary(model.2)
 
 # Prediccion en train
-m2_probs <- predict(model.2, newdata = test_nan)
+m2_probs <- predict(model.2, newdata = test)
 
 # Matriz de confusion
 m2_pred <- rep(0, length(m2_probs))
-m2_pred[m2_probs < test_nan$lp] <- 1
-m2_acc <- table(m2_pred, test_nan$pobre)
+m2_pred[m2_probs < test$lp] <- 1
+m2_acc <- table(m2_pred, test$poor)
 
-# Accuracy - 74.98%
+# Accuracy - 75.1%
 confusionMatrix(m2_acc)
 
 # Estimacion 2.2: SMOTE
-model.2 <- lm(ingtotug ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
+model.2 <- lm(ing ~ clase + sex + parent_2 + parent_3 + parent_4
               + parent_5 + parent_6 + parent_7 + parent_8 + parent_9
-              + parent_3 + rooms + bedrooms + property_2 + property_3
-              + property_4 + property_5 + property_6 + nper,
+              + rooms + bedrooms + prop_2 + prop_3 + prop_4 + prop_5 + prop_6
+              + nper,
               data = smote)
 
 sum_m2 <- summary(model.2)
 
 # Prediccion en train
-m2_probs <- predict(model.2, newdata = test_nan)
+m2_probs <- predict(model.2, newdata = test)
 
 # Matriz de confusion
 m2_pred <- rep(0, length(m2_probs))
-m2_pred[m2_probs < test_nan$lp] <- 1
-m2_acc <- table(m2_pred, test_nan$pobre)
+m2_pred[m2_probs < test$lp] <- 1
+m2_acc <- table(m2_pred, test$poor)
 
-# Accuracy - 75.05%
+# Accuracy - 75.14%
 confusionMatrix(m2_acc)
 
-# Subset Selection
-sub_sel <- regsubsets(as.factor(class)~., data = tr_b, nvmax = 15)
+
+# MODELOS ======================================================================
+
+# Modelo 3: Logit (clasificacion directa) --------------------------------------
+# Estimacion 3.0: ingenuo
+model.3 <- glm(poor ~ rooms + bedrooms + nper + npersug + clase
+               + sex + age + health + rent_rec + help + grade + prop_2 + prop_3
+               + prop_4 + prop_5 + prop_6 + parent_2 + parent_3 + parent_4
+               + parent_5 + parent_6 + parent_7 + parent_8 + parent_9 
+               + health_aff_2 + health_aff_3 + health_aff_9 + educ_1 + educ_2
+               + educ_3 + educ_4 + educ_5 + educ_9, 
+               data = train, family = "binomial")
+
+sum_m3 <- summary(model.3)
+
+# Prediccion en train
+m3_probs <- predict(model.3, type = "response", newdata = test)
+
+# Matriz de confusion
+m3_pred <- rep(0, length(fitted(model.3)))
+m3_pred[m3_probs > 0.5] = 1
+m3_acc <- table(m3_pred, model.3$y)
+
+# Accuracy - 68.8%
+confusionMatrix(m3_acc)
+
+# Estimacion 3.1: undersampling
+model.3 <- glm(as.numeric(poor) ~ rooms + bedrooms + nper + npersug + clase
+               + sex + age + health + rent_rec + help + grade + prop_2 + prop_3
+               + prop_4 + prop_5 + prop_6 + parent_2 + parent_3 + parent_4
+               + parent_5 + parent_6 + parent_7 + parent_8 + parent_9 
+               + health_aff_2 + health_aff_3 + health_aff_9 + educ_1 + educ_2
+               + educ_3 + educ_4 + educ_5, 
+               data = undersample, family = "binomial")
+
+sum_m3 <- summary(model.3)
+
+# Prediccion en train
+m3_probs <- predict(model.3, type = "response", newdata = test)
+
+# Matriz de confusion
+m3_pred <- rep(0, length(fitted(model.3)))
+m3_pred[m3_probs > 0.5] = 1
+m3_acc <- table(m3_pred, model.3$y)
+
+# Accuracy - 50.01%
+confusionMatrix(m3_acc)
+
+# Estimacion 3.2: SMOTE
+model.3 <- glm(as.numeric(poor) ~ rooms + bedrooms + nper + npersug + clase
+               + sex + age + health + rent_rec + help + grade + prop_2 + prop_3
+               + prop_4 + prop_5 + prop_6 + parent_2 + parent_3 + parent_4
+               + parent_5 + parent_6 + parent_7, parent_8, parent_9 
+               + health_aff_2 + health_aff_3 + health_aff_9 + educ_1 + educ_2
+               + educ_3 + educ_4 + educ_5 + educ_9, 
+               data = smote, family = "binomial")
+
+sum_m3 <- summary(model.3)
+
+# Prediccion en train
+m3_probs <- predict(model.3, type = "response", newdata = test)
+
+# Matriz de confusion
+m3_pred <- rep(0, length(fitted(model.3)))
+m3_pred[m3_probs > 0.5] = 1
+m3_acc <- table(m3_pred, model.3$y)
+
+# Accuracy - 50.01%
+confusionMatrix(m3_acc)
+
+# Modelo 4: LDA (clasificicacion directa) --------------------------------------
+#Estimacion 4.0: ingenuo
+
+model.4 <- lda(as.numeric(poor) ~ rooms + bedrooms + nper + npersug + clase
+                   + sex + age + rent_rec + help + grade + prop_2 + prop_3
+                   + prop_4 + prop_5 + prop_6 + parent_2 + parent_3 + parent_4
+                   + parent_5 + parent_6 + parent_7 + parent_8 + parent_9 
+                   + health_aff_2 + health_aff_3 + health_aff_9 + educ_1 + educ_2
+                   + educ_3 + educ_4 + educ_5 + educ_9, 
+                   data = train)
+model.4
+model.4.pred <- predict(model.4, test)
+model.4.class <- model.4.pred$class
+m4_acc <- table(model.4.class, test$poor)
+
+# Accuracy - 81.08%
+confusionMatrix(m4_acc)
+
+#Estimacion 4.1: Undersample
+
+model.4 <- lda(as.numeric(poor) ~ rooms + bedrooms + nper + npersug + clase
+               + sex + age + rent_rec + help + grade + prop_2 + prop_3
+               + prop_4 + prop_5 + prop_6 + parent_2 + parent_3 + parent_4
+               + parent_5 + parent_6 + parent_7 + parent_8 + parent_9 
+               + health_aff_2 + health_aff_3 + health_aff_9 + educ_1 + educ_2
+               + educ_3 + educ_4 + educ_5, 
+               data = undersample)
+model.4
+model.4.pred <- predict(model.4, test)
+model.4.class <- model.4.pred$class
+m4_acc <- table(model.4.class, test$poor)
+
+# Accuracy - 71.46%
+confusionMatrix(m4_acc)
+
+#Estimacion 4.2: SMOTE
+
+model.4 <- lda(as.numeric(poor) ~ rooms + bedrooms + nper + npersug + clase
+               + sex + age + rent_rec + help + grade + prop_2 + prop_3
+               + prop_4 + prop_5 + prop_6 + parent_2 + parent_3 + parent_4
+               + parent_5 + parent_6 + parent_7 + parent_8 + parent_9 
+               + health_aff_2 + health_aff_3 + health_aff_9 + educ_1 + educ_2
+               + educ_3 + educ_4 + educ_5, 
+               data = smote)
+model.4
+model.4.pred <- predict(model.4, test)
+model.4.class <- model.4.pred$class
+m4_acc <- table(model.4.class, test$poor)
+
+# Accuracy - 77.08%
+confusionMatrix(m4_acc)
+
+
+# Modelo 5: Regresion Lineal (prediccion de ingreso) ---------------------------
+
+# Estimacion 5.0: ingenuo 
+model.5 <- lm(ing ~ rooms + bedrooms + nper + npersug + clase
+              + sex + age + rent_rec + help + grade + prop_2 + prop_3
+              + prop_4 + prop_5 + prop_6 + parent_2 + parent_3 + parent_4
+              + parent_5 + parent_6 + parent_7 + parent_8 + parent_9 
+              + health_aff_2 + health_aff_3 + health_aff_9 + educ_1 + educ_2
+              + educ_3 + educ_4 + educ_5, 
+              data = train)
+
+sum_m5 <- summary(model.5)
+
+# Prediccion en train
+m5_probs <- predict(model.5, newdata = test)
+
+# Matriz de confusion
+m5_pred <- rep(0, length(m5_probs))
+m5_pred[m5_probs < test$lp] <- 1
+m5_acc <- table(m5_pred, test$poor)
+
+# Accuracy - 74.98%
+confusionMatrix(m5_acc)
+
+# Estimacion 5.1: Undersampling 
+model.5 <- lm(ing ~ rooms + bedrooms + nper + npersug + clase
+              + sex + age + rent_rec + help + grade + prop_2 + prop_3
+              + prop_4 + prop_5 + prop_6 + parent_2 + parent_3 + parent_4
+              + parent_5 + parent_6 + parent_7 + parent_8 + parent_9 
+              + health_aff_2 + health_aff_3 + health_aff_9 + educ_1 + educ_2
+              + educ_3 + educ_4 + educ_5, 
+              data = undersample)
+
+sum_m5 <- summary(model.5)
+
+# Prediccion en train
+m5_probs <- predict(model.5, newdata = test)
+
+# Matriz de confusion
+m5_pred <- rep(0, length(m5_probs))
+m5_pred[m5_probs < test$lp] <- 1
+m5_acc <- table(m5_pred, test$poor)
+
+# Accuracy - 74.13%
+confusionMatrix(m5_acc)
+
+# Estimacion 5.2: SMOTE
+model.5 <- lm(ing ~ rooms + bedrooms + nper + npersug + clase
+              + sex + age + rent_rec + help + grade + prop_2 + prop_3
+              + prop_4 + prop_5 + prop_6 + parent_2 + parent_3 + parent_4
+              + parent_5 + parent_6 + parent_7 + parent_8 + parent_9 
+              + health_aff_2 + health_aff_3 + health_aff_9 + educ_1 + educ_2
+              + educ_3 + educ_4 + educ_5, 
+              data = smote)
+
+sum_m5 <- summary(model.5)
+
+# Prediccion en train
+m5_probs <- predict(model.5, newdata = test)
+
+# Matriz de confusion
+m5_pred <- rep(0, length(m5_probs))
+m5_pred[m5_probs < test$lp] <- 1
+m5_acc <- table(m5_pred, test$poor)
+
+# Accuracy - 74.14%
+confusionMatrix(m5_acc)
+
+
+# SUBSET SELECTION =============================================================
+sub_sel <- regsubsets(as.factor(poor)~., data = train, nvmax = 20, method="forward")
 sum.sub_sel <- summary(sub_sel)
 
 # Metricas
