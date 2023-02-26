@@ -8,6 +8,7 @@ library(ISLR2)
 library(leaps)
 library(MASS)
 library(pacman)
+library(rpart)
 library(smotefamily)
 library(tidyverse)
 
@@ -99,7 +100,46 @@ hist(train$l_help)
 
 # Resolver NAs -----------------------------------------------------------------
 
+# Contar NAs
+colSums(is.na(train)) %>% as.data.frame()
 
+# Imputacion por Arboles de Decision
+
+# I. Health
+aux <- subset(train, select = c("health", "estrato", "age", "nper", "ing"))
+aux$health <- ifelse(aux$health == "9", NA, aux$health)
+tree_model <- rpart(health ~ ., data = aux, method = "class")
+aux$health[is.na(aux$health)] <- predict(tree_model, newdata = aux[is.na(aux$health), ], type = "class")
+aux$health <- ifelse(aux$health == "1", 0, 1)
+train$health <- aux$health
+
+# II. Help
+aux <- subset(train, select = c("help", "estrato", "age", "nper", "ing"))
+tree_model <- rpart(help ~ ., data = aux)
+aux$help[is.na(aux$help)] <- predict(tree_model, newdata = aux[is.na(aux$help), ])
+train$help <- aux$help
+
+# III. Educ
+aux <- subset(train, select = c("educ", "estrato", "age", "nper", "ing"))
+tree_model <- rpart(educ ~ ., data = aux, method = "class")
+aux$educ[is.na(aux$educ)] <- predict(tree_model, newdata = aux[is.na(aux$educ), ], type = "class")
+train$educ <- aux$educ
+
+# IV. Grade
+aux <- subset(train, select = c("grade", "estrato", "age", "nper", "ing"))
+tree_model <- rpart(grade ~ ., data = aux)
+aux$grade[is.na(aux$grade)] <- predict(tree_model, newdata = aux[is.na(aux$grade), ])
+train$grade <- aux$grade
+
+# V. Health_aff
+aux <- subset(train, select = c("health_aff", "estrato", "age", "nper", "ing"))
+tree_model <- rpart(health_aff ~ ., data = aux, method = "class")
+aux$health_aff[is.na(aux$health_aff)] <- predict(tree_model, newdata = aux[is.na(aux$health_aff), ], type = "class")
+train$health_aff <- aux$health_aff
+train$l_help <- log(train$help)
+
+# Check - Conteo de NAs
+colSums(is.na(train)) %>% as.data.frame()
 
 # BALANCEO DE DATOS ============================================================
 
