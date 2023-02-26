@@ -80,24 +80,6 @@ train$ayuda_2 <- ifelse(is.na(train$ayuda_2), 0, train$ayuda_2)
 train$rent_rec <- train$ayuda_1 + train$ayuda_2
 train <- dplyr::select(train, -ayuda_1, -ayuda_2)
 
-# Histogramas...
-hist(train$rent_rec)
-hist(train$ing)
-hist(train$lp)
-hist(train$help)
-
-# Logaritmos
-train$l_rent_rec <- log(train$rent_rec)
-train$l_ing <- log(train$ing)
-train$l_lp <- log(train$lp)
-train$l_help <- log(train$help)
-
-# Histogramas corregidos
-hist(train$l_rent_rec)
-hist(train$l_ing)
-hist(train$l_lp)
-hist(train$l_help)
-
 # Resolver NAs -----------------------------------------------------------------
 
 # Contar NAs
@@ -136,51 +118,51 @@ aux <- subset(train, select = c("health_aff", "estrato", "age", "nper", "ing"))
 tree_model <- rpart(health_aff ~ ., data = aux, method = "class")
 aux$health_aff[is.na(aux$health_aff)] <- predict(tree_model, newdata = aux[is.na(aux$health_aff), ], type = "class")
 train$health_aff <- aux$health_aff
-train$l_help <- log(train$help)
 
 # Check - Conteo de NAs
 colSums(is.na(train)) %>% as.data.frame()
 
+# DUMMIES  =================================================================
+
+# Definir variables categoricas
+cols_f <- c("prop", "parent", "health_aff", "educ")
+train[, cols_f] <- data.frame(apply(train[cols_f], 2, as.factor))
+test[, cols_f] <- data.frame(apply(test[cols_f], 2, as.factor))
+
+# Crear Dummies
+train <- dummy_cols(train, select_columns = cols_f)
+
+
 # BALANCEO DE DATOS ============================================================
 
 # Histograma - Desbalance
-hist(tr$pobre, col="magenta")
-prop.table(table(tr$pobre))
+hist(train$poor, col="magenta")
+prop.table(table(train$poor))
 
 # Preparar datos para balanceo
-aux <- tr[,2:35]
-col_numer <- c("clase", "sex", "parent", "property", "pobre")
-aux[,col_numer] <- data.frame(apply(aux[col_numer], 2, as.numeric))
+aux <- train[, 2:46]
 
 # 1. UnderSampling
 
 # Undersample
-undersample <- downSample(x = aux[, -ncol(aux)], y = as.factor(aux$pobre))
+undersample <- downSample(x = aux[, -ncol(aux)], y = as.factor(aux$poor))
 
 # Revisar correcion de balance
-hist(as.numeric(undersample$pobre), col="coral")
-prop.table(table(undersample$pobre))
-
+hist(as.numeric(undersample$poor), col="coral")
+prop.table(table(undersample$poor))
 
 #2. SMOTE
 
 # SMOTE 
-smote <- SMOTE(aux[,-12], aux$pobre)
+aux[, cols_f] <- data.frame(apply(aux[cols_f], 2, as.numeric))
+smote <- SMOTE(aux[, -7], aux$poor)
 smote <- smote$data
-names(smote)[names(smote) == "class"] <- "pobre"
+names(smote)[names(smote) == "class"] <- "poor"
 
 
 # Revisar correcion de balance
-hist(as.numeric(smote$pobre), col="coral")
-prop.table(table(smote$pobre))
-
-
-# DUMMIES Y NA =================================================================
-
-# Definir variables categoricas con 0 NAs
-cols_nan_cat <- c("Clase.x", "P6020", "P6050", "P5090", "Pobre")
-tr[,cols_nan_cat] <- data.frame(apply(tr[cols_nan_cat], 2, as.factor))
-test_nan[,cols_nan_cat] <- data.frame(apply(test_nan[cols_nan_cat], 2, as.factor))
+hist(as.numeric(smote$poor), col="coral")
+prop.table(table(smote$poor))
 
 
 # MODELOS INGENUOS =============================================================
