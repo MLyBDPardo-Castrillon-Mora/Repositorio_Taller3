@@ -31,7 +31,7 @@ kaggle <- merge(ka.p, ka.h, by='id')
 # Split de datos
 
 db$obs <- 1:nrow(db)
-indices <- createDataPartition(y = db$obs, p = 0.7, list = FALSE)
+indices <- createDataPartition(y = db$obs, p = 0.8, list = FALSE)
 train <- db[indices, ]
 dev_set <- db[-indices, ]
 
@@ -41,40 +41,119 @@ dev_set <- dev_set[-indices_1, ]
 
 # Seleccion de datos -----------------------------------------------------------
 
-# Preservar variables con valores completos
-cols_preserve <- c("id", "Clase.x", "P6020", "P6040", "P6050", "P5000", "P5010",
-              "P5090", "Nper", "Npersug", "Ingtotug", "Lp", "Pobre", "Npobres")
-tr <- train[,cols_preserve]
-test_nan <- test[,cols_preserve]
+# Seleccion de variables
+
+train <- dplyr::select(train, id, P5000, P5010, Nper, P5130, P5140, Npersug, Ingtotug, 
+                Lp, Pobre, Clase.x, P5090, Estrato1, P6020, P6040, P6090, P7495,
+                P7510s1a1, P6050, P6100, P6210, P6210s1)
+
+dev_set <- dplyr::select(dev_set, id, P5000, P5010, Nper, P5130, P5140, Npersug, Ingtotug, 
+                       Lp, Pobre, Clase.x, P5090, Estrato1, P6020, P6040, P6090, P7495,
+                       P7510s1a1, P6050, P6100, P6210, P6210s1)
+
+test <- dplyr::select(test, id, P5000, P5010, Nper, P5130, P5140, Npersug, Ingtotug, 
+                       Lp, Pobre, Clase.x, P5090, Estrato1, P6020, P6040, P6090, P7495,
+                       P7510s1a1, P6050, P6100, P6210, P6210s1)
+
+# Nombres legibles...
+colnames(train) <- c("id", "rooms", "bedrooms", "nper", "ayuda_1", "ayuda_2", 
+                     "npersug", "ing", "lp", "poor", "clase", "prop", "estrato",
+                     "sex", "age", "health", "rent_rec", "help", "parent", 
+                     "health_aff", "educ", "grade")
+
+colnames(test) <- c("id", "rooms", "bedrooms", "nper", "ayuda_1", "ayuda_2", 
+                    "npersug", "ing", "lp", "poor", "clase", "prop", "estrato",
+                    "sex", "age", "health", "rent_rec", "help", "parent", 
+                    "health_aff", "educ", "grade")
+
+colnames(dev_set) <- c("id", "rooms", "bedrooms", "nper", "ayuda_1", "ayuda_2", 
+                       "npersug", "ing", "lp", "poor", "clase", "prop", "estrato",
+                       "sex", "age", "health", "rent_rec", "help", "parent", 
+                       "health_aff", "educ", "grade")
+
+# Transformaciones -------------------------------------------------------------
+
+# Crear variable "rent_est"
+train$ayuda_1 <- ifelse(is.na(train$ayuda_1), 0, train$ayuda_1)
+train$ayuda_2 <- ifelse(is.na(train$ayuda_2), 0, train$ayuda_2)
+train$rent_rec <- train$ayuda_1 + train$ayuda_2
+train <- dplyr::select(train, -ayuda_1, -ayuda_2)
+
+# Histogramas...
+hist(train$rent_rec)
+hist(train$ing)
+hist(train$lp)
+hist(train$help)
+
+# Logaritmos
+train$l_rent_rec <- log(train$rent_rec)
+train$l_ing <- log(train$ing)
+train$l_lp <- log(train$lp)
+train$l_help <- log(train$help)
+
+# Histogramas corregidos
+hist(train$l_rent_rec)
+hist(train$l_ing)
+hist(train$l_lp)
+hist(train$l_help)
+
+# Resolver NAs -----------------------------------------------------------------
+
+
+
+# BALANCEO DE DATOS ============================================================
+
+# Histograma - Desbalance
+hist(tr$pobre, col="magenta")
+prop.table(table(tr$pobre))
+
+# Preparar datos para balanceo
+aux <- tr[,2:35]
+col_numer <- c("clase", "sex", "parent", "property", "pobre")
+aux[,col_numer] <- data.frame(apply(aux[col_numer], 2, as.numeric))
+
+# 1. UnderSampling
+
+# Undersample
+undersample <- downSample(x = aux[, -ncol(aux)], y = as.factor(aux$pobre))
+
+# Revisar correcion de balance
+hist(as.numeric(undersample$pobre), col="coral")
+prop.table(table(undersample$pobre))
+
+
+#2. SMOTE
+
+# SMOTE 
+smote <- SMOTE(aux[,-12], aux$pobre)
+smote <- smote$data
+names(smote)[names(smote) == "class"] <- "pobre"
+
+
+# Revisar correcion de balance
+hist(as.numeric(smote$pobre), col="coral")
+prop.table(table(smote$pobre))
+
+
+# DUMMIES Y NA =================================================================
 
 # Definir variables categoricas con 0 NAs
 cols_nan_cat <- c("Clase.x", "P6020", "P6050", "P5090", "Pobre")
 tr[,cols_nan_cat] <- data.frame(apply(tr[cols_nan_cat], 2, as.factor))
 test_nan[,cols_nan_cat] <- data.frame(apply(test_nan[cols_nan_cat], 2, as.factor))
 
-# Nombres legibles...
-colnames(tr) <- c("id", "clase", "sex", "age", "parent", "rooms", "bedrooms", 
-            "property", "nper", "npersug", "ingtotug", "lp", "pobre", "npobres")
-colnames(test_nan) <- c("id", "clase", "sex", "age", "parent", "rooms", "bedrooms", 
-            "property", "nper", "npersug", "ingtotug", "lp", "pobre", "npobres")
-cols_nan_cat <- c("clase", "sex", "parent", "property", "pobre")
-
-# Dummy Variables
-tr <- fastDummies::dummy_cols(tr, select_columns = cols_nan_cat)
-test_nan <- fastDummies::dummy_cols(test_nan, select_columns=cols_nan_cat)
-tr$pobre <- as.numeric(as.character(tr$pobre))
-test_nan$pobre <- as.numeric(as.character(test_nan$pobre))
-
 
 # MODELOS INGENUOS =============================================================
 
 # Modelo 1: Logit (clasificacion directa) --------------------------------------
-# Estimacion
-model.1 <- glm(pobre ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
+
+
+# Estimacion 1.1: undersampling
+model.1 <- glm(as.numeric(pobre) ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
                + parent_5 + parent_6 + parent_7 + parent_8 + parent_9
                + parent_3 + rooms + bedrooms + property_2 + property_3
                + property_4 + property_5 + property_6 + nper,
-               data = tr, family = "binomial")
+               data = smote, family = "binomial")
 
 sum_m1 <- summary(model.1)
 
@@ -86,16 +165,37 @@ m1_pred <- rep(0, length(fitted(model.1)))
 m1_pred[m1_probs > 0.5] = 1
 m1_acc <- table(m1_pred, model.1$y)
 
-# Accuracy - 69.77%
+# Accuracy - 50.08%
+confusionMatrix(m1_acc)
+
+# Estimacion 1.2: SMOTE
+model.1 <- glm(as.numeric(pobre) ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
+               + parent_5 + parent_6 + parent_7 + parent_8 + parent_9
+               + parent_3 + rooms + bedrooms + property_2 + property_3
+               + property_4 + property_5 + property_6 + nper,
+               data = smote, family = "binomial")
+
+sum_m1 <- summary(model.1)
+
+# Prediccion en train
+m1_probs <- predict(model.1, type = "response", newdata = test_nan)
+
+# Matriz de confusion
+m1_pred <- rep(0, length(fitted(model.1)))
+m1_pred[m1_probs > 0.5] = 1
+m1_acc <- table(m1_pred, model.1$y)
+
+# Accuracy - 54.84%
 confusionMatrix(m1_acc)
 
 # Modelo 2: Regresion Lineal (prediccion de ingreso) ---------------------------
-# Estimacion
+
+# Estimacion 2.1: undersampling
 model.2 <- lm(ingtotug ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
                + parent_5 + parent_6 + parent_7 + parent_8 + parent_9
                + parent_3 + rooms + bedrooms + property_2 + property_3
                + property_4 + property_5 + property_6 + nper,
-               data = tr)
+               data = undersample)
 
 sum_m2 <- summary(model.2)
 
@@ -107,27 +207,28 @@ m2_pred <- rep(0, length(m2_probs))
 m2_pred[m2_probs < test_nan$lp] <- 1
 m2_acc <- table(m2_pred, test_nan$pobre)
 
-# Accuracy - 74.97%
+# Accuracy - 74.98%
 confusionMatrix(m2_acc)
 
+# Estimacion 2.2: SMOTE
+model.2 <- lm(ingtotug ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
+              + parent_5 + parent_6 + parent_7 + parent_8 + parent_9
+              + parent_3 + rooms + bedrooms + property_2 + property_3
+              + property_4 + property_5 + property_6 + nper,
+              data = smote)
 
-# BALANCEO DE DATOS ============================================================
+sum_m2 <- summary(model.2)
 
-# Histograma - Desbalance
-hist(tr$pobre, col="blue")
-prop.table(table(tr$pobre))
+# Prediccion en train
+m2_probs <- predict(model.2, newdata = test_nan)
 
-# SMOTE 
-aux <- tr[,2:35]
-col_numer <- c("clase", "sex", "parent", "property", "pobre")
-aux[,col_numer] <- data.frame(apply(aux[col_numer], 2, as.numeric))
-smote <- SMOTE(aux[,-12], aux$pobre)
-tr_b <- smote$data
+# Matriz de confusion
+m2_pred <- rep(0, length(m2_probs))
+m2_pred[m2_probs < test_nan$lp] <- 1
+m2_acc <- table(m2_pred, test_nan$pobre)
 
-# Revisar correcion de balance
-hist(as.numeric(tr_b$class), col="coral")
-prop.table(table(tr_b$class))
-
+# Accuracy - 75.05%
+confusionMatrix(m2_acc)
 
 # Subset Selection
 sub_sel <- regsubsets(as.factor(class)~., data = tr_b, nvmax = 15)
