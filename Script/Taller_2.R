@@ -161,7 +161,7 @@ ctrl<- trainControl(method = "cv",
                     verbose=FALSE,
                     savePredictions = "final")
 
-modelo <- train(PobreTrue ~ P6090,
+modelo <- train(PobreTrue ~ Clase + P5000 + P5010+P5090+Nper+Npersug+Ingtotug+Li+Lp+Indigente,
                 data = train_prom2_rsam,
                 method = "glmStepAIC",
                 trControl = ctrl,
