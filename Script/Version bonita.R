@@ -15,35 +15,55 @@ library(tidyverse)
 # DATOS ========================================================================
 # Base de datos ----------------------------------------------------------------
 
+# Semilla
+set.seed(4040)
+
 # Importacion de datos
-tr.h <- read.csv("~/Downloads/uniandes-bdml-20231-ps2/train_hogares.csv")
-t.h <- read.csv("~/Downloads/uniandes-bdml-20231-ps2/test_hogares.csv")
-tr.p <- read.csv("~/Downloads/uniandes-bdml-20231-ps2/train_personas.csv")
-t.p <- read.csv("~/Downloads/uniandes-bdml-20231-ps2/test_personas.csv")
+db.h <- read.csv("~/Downloads/uniandes-bdml-20231-ps2/train_hogares.csv")
+ka.h <- read.csv("~/Downloads/uniandes-bdml-20231-ps2/test_hogares.csv")
+db.p <- read.csv("~/Downloads/uniandes-bdml-20231-ps2/train_personas.csv")
+ka.p <- read.csv("~/Downloads/uniandes-bdml-20231-ps2/test_personas.csv")
 
 # Union de las bases de datos
-train <- merge(tr.p,tr.h,by='id')
-test <- merge(test_personas,test_hogares,by='id')
+db <- merge(db.p, db.h, by='id')
+kaggle <- merge(ka.p, ka.h, by='id')
+
+# Split de datos
+
+db$obs <- 1:nrow(db)
+indices <- createDataPartition(y = db$obs, p = 0.7, list = FALSE)
+train <- db[indices, ]
+dev_set <- db[-indices, ]
+
+indices_1 <- createDataPartition(y = dev_set$obs, p = 0.5, list = FALSE)
+test <- dev_set[indices_1, ]
+dev_set <- dev_set[-indices_1, ]
 
 # Seleccion de datos -----------------------------------------------------------
 
 # Preservar variables con valores completos
 cols_preserve <- c("id", "Clase.x", "P6020", "P6040", "P6050", "P5000", "P5010",
               "P5090", "Nper", "Npersug", "Ingtotug", "Lp", "Pobre", "Npobres")
-tr <- train[,cols_preserve] 
+tr <- train[,cols_preserve]
+test_nan <- test[,cols_preserve]
 
 # Definir variables categoricas con 0 NAs
 cols_nan_cat <- c("Clase.x", "P6020", "P6050", "P5090", "Pobre")
 tr[,cols_nan_cat] <- data.frame(apply(tr[cols_nan_cat], 2, as.factor))
+test_nan[,cols_nan_cat] <- data.frame(apply(test_nan[cols_nan_cat], 2, as.factor))
 
 # Nombres legibles...
 colnames(tr) <- c("id", "clase", "sex", "age", "parent", "rooms", "bedrooms", 
             "property", "nper", "npersug", "ingtotug", "lp", "pobre", "npobres")
+colnames(test_nan) <- c("id", "clase", "sex", "age", "parent", "rooms", "bedrooms", 
+            "property", "nper", "npersug", "ingtotug", "lp", "pobre", "npobres")
 cols_nan_cat <- c("clase", "sex", "parent", "property", "pobre")
 
 # Dummy Variables
-tr <- fastDummies::dummy_cols(tr, select_columns=cols_nan_cat)
+tr <- fastDummies::dummy_cols(tr, select_columns = cols_nan_cat)
+test_nan <- fastDummies::dummy_cols(test_nan, select_columns=cols_nan_cat)
 tr$pobre <- as.numeric(as.character(tr$pobre))
+test_nan$pobre <- as.numeric(as.character(test_nan$pobre))
 
 
 # MODELOS INGENUOS =============================================================
@@ -59,14 +79,14 @@ model.1 <- glm(pobre ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
 sum_m1 <- summary(model.1)
 
 # Prediccion en train
-m1_probs <- predict(model.1, type = "response")
+m1_probs <- predict(model.1, type = "response", newdata = test_nan)
 
 # Matriz de confusion
 m1_pred <- rep(0, length(fitted(model.1)))
 m1_pred[m1_probs > 0.5] = 1
 m1_acc <- table(m1_pred, model.1$y)
 
-# Accuracy - 77.56%
+# Accuracy - 69.77%
 confusionMatrix(m1_acc)
 
 # Modelo 2: Regresion Lineal (prediccion de ingreso) ---------------------------
@@ -80,15 +100,14 @@ model.2 <- lm(ingtotug ~ clase_2 + sex_2 + parent_2 + parent_3 + parent_4
 sum_m2 <- summary(model.2)
 
 # Prediccion en train
-m2_pred <- predict(model.2)
+m2_probs <- predict(model.2, newdata = test_nan)
 
 # Matriz de confusion
-m2_poor <- rep(0, length(fitted(model.2)))
-m2_c <- cbind.data.frame(tr$pobre , tr$lp, m2_pred, m2_poor)
-m2_c$m2_poor <- ifelse(tr$lp>m2_pred, 1, 0)
-m2_acc <- table(m2_c[,4], m2_c[,1])
+m2_pred <- rep(0, length(m2_probs))
+m2_pred[m2_probs < test_nan$lp] <- 1
+m2_acc <- table(m2_pred, test_nan$pobre)
 
-# Accuracy - 74.94%
+# Accuracy - 74.97%
 confusionMatrix(m2_acc)
 
 
@@ -96,6 +115,7 @@ confusionMatrix(m2_acc)
 
 # Histograma - Desbalance
 hist(tr$pobre, col="blue")
+prop.table(table(tr$pobre))
 
 # SMOTE 
 aux <- tr[,2:35]
