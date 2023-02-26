@@ -3,6 +3,13 @@
 library(dplyr)
 library(e1071)
 library(MASS)
+library(pacman)
+library(caret)
+library(tidyverse)
+library(ISLR2)
+library(leaps)
+library(fastDummies)
+library (DescTools)
 
 # DATOS ========================================================================
 
@@ -64,86 +71,141 @@ train_personas$Ingtot
 
 # Base de datos - aux_RC
 train_RC <- train_merge %>% dplyr::select(
-  Estrato1, Pobre, P5000, P5010, Nper, P6020, P6040, P6090, P6210s1,P6585s1, 
-  P6585s3, P6590, P6620, P6800, P6920, P7040, P7510s3, P6050)
+  Pobre, Clase.x, Depto.x, P6020, P6040, P6050,
+  P6090, P6210, P6240, P7495, P7505, Pet, 
+  P5000, P5010, P5090, Nper, Npersug)
 
-test_RC <- test_merge %>% dplyr::select(
-  P5000, P5010, Nper, P6020, P6040, P6090, P6210s1,P6585s1, 
-  P6585s3, P6590, P6620, P6800, P6920, P7040, P7510s3, P6050)
+test_RC <- train_merge %>% dplyr::select(
+  Clase.x, Depto.x, P6020, P6040, P6050,
+  P6090, P6210, P6240, P7495, P7505, Pet, 
+  P5000, P5010, P5090, Nper, Npersug)
+
+# Factor Variables
+cols_f <- c("Clase.x", "Depto.x", "P6090", "P6020", "P6210", "P6240", "P7495", "P7505", "Pet", "P5090")
+train_RC[,cols_f] <- data.frame(apply(train_RC_aux[cols_f], 2, as.factor))
+test_RC[,cols_f] <- data.frame(apply(test_RC_aux[cols_f], 2, as.factor))
 
 # Limpieza de datos ------------------------------------------------------------
+# 1. Datos de entrenamiento
 
 # Contar NAs en la base de datos
 colSums(is.na(train_RC)) %>% as.data.frame()
 
-# Eliminar columnas con DEMASIADOS NAs
-train_RC <- train_RC %>% dplyr::select(-P6590, -P6620, -P6800, -P7040, -P7510s3)
-
-# Arreglamos P6585s1 y P6585s3 con su media si el estrato es 'bajo'...
-train_RC$P6585s1[is.na(train_RC$P6585s1) == "TRUE" & train_RC$Estrato1>1] <- 0
-train_RC$P6585s3[is.na(train_RC$P6585s3) == "TRUE" & train_RC$Estrato1>1] <- 0
-
-length(which(train_RC$P6585s1 == "0"))
-length(which(train_RC$P6585s3 == "0"))
-
-# Crear lista auxiliar de NAs
-list_na_train <- colnames(train_RC)[apply(train_RC, 2, anyNA)]
+# Crear lista auxiliar de NAs - Dummys
+train_list_d <- c("P6090", "P6210", "P6240", "P7495", "P7505")
 
 # Media por Variable
-average_missing_train <- apply(train_RC[,colnames(train_RC) %in% list_na_train],
-                         2,
-                         mean,
-                         na.rm =  TRUE)
-average_missing_train
+for (i in 1:ncol(train_RC)){
+  mod_val <- Mode(na.omit(train_RC[, i]))
+  cat(i, ":", mod_val, "\n")
+}
+mode_d <- c(1, 3, 1, 2, 2)
 
 # Reemplazamos medias en los NAs - Creamos nueva base de datos
-train_prueba <- train_RC %>%
-  mutate(P6090_n  = ifelse(is.na(P6090), average_missing_train[1], P6090),
-         P6210s1_n  = ifelse(is.na(P6210s1), average_missing_train[2], P6210s1),
-         P6585s1_n  = ifelse(is.na(P6585s1), average_missing_train[3], P6585s1),
-         P6585s3_n  = ifelse(is.na(P6585s3), average_missing_train[4], P6585s3),
-         P6920_n = ifelse(is.na(P6920), average_missing_train[5], P6920))
+train_db <- train_RC %>%
+  dplyr::mutate(P6090 = ifelse(is.na(P6090), mode_d[1], P6090),
+                P6210 = ifelse(is.na(P6210), mode_d[2], P6210),
+                P6240 = ifelse(is.na(P6240), mode_d[3], P6240),
+                P7495 = ifelse(is.na(P7495), mode_d[4], P7495),
+                P7505 = ifelse(is.na(P7505), mode_d[5], P7505))
 
 # Checkear NAs en variables con medias
-colSums(is.na(train_prueba)) %>% as.data.frame()
+colSums(is.na(train_db)) %>% as.data.frame()
+
+# Crear Dummys
+train_db <- fastDummies::dummy_cols(train_db)
+
+# Clasificador por hogares
+home_class <- train_db[train_db$P6050=="1",]
+colSums(is.na(home_class)) %>% as.data.frame()
 
 #MODELOS =======================================================================
 
 # LOGIT ------------------------------------------------------------------------
 
 # Modelo
-glm.fits <- glm(Pobre ~ P5000 + P5010 + Nper + P6020 + P6040 + P6090_n + P6210s1_n + P6585s1_n + P6585s3_n + P6920_n + P6050,
-                data = train_prueba, family = "binomial")
+glm.fits <- glm(Pobre ~ Clase.x + P6020_2 + P6040 + I(P6040^2) + P6090_2 + P6210_1
+                + P6210_2 + P6210_3 + P6210_4+ P6210_5 + P6240_2+ P6240_3+ P6240_4
+                + P6240_5+ P6240_6 + P7495_2 + P7505_1 + P5000 + P5010 + Nper 
+                + Npersug + P5090_2 + P5090_3 + P5090_4 + P5090_5 + P5090_6,
+                data = home_class, family = "binomial")
+
 summary(glm.fits)
 
 # Train check
 glm.probs <- predict(glm.fits, type = "response")
 glm.pred <- rep("No-pobre", length(fitted(glm.fits)))
-glm.pred[glm.probs > 0.4] = "Pobre"
+glm.pred[glm.probs > 0.5] = "Pobre"
 table(glm.pred, glm.fits$y)
+
+# CARET-Logit
+
+home_class$Pobre = as.factor(home_class$Pobre)
+
+levels(home_class$Pobre) <- c("No.pobre", "Pobre")
+
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    summaryFunction = fiveStats,
+                    classProbs = TRUE,
+                    verbose=FALSE,
+                    savePredictions = T)
+
+mylogit_caret <- train(Pobre ~ P5000 + P5010 + Nper + P6020 + P6040 + P6090_n + 
+                         P6210s1_n + P6585s1_n + P6585s3_n + P6920_n + P7495_n, 
+                       data = home_class, 
+                       method = "glm",
+                       trControl = ctrl,
+                       family = "binomial", 
+                       metric = 'ROC')
+mylogit_caret
+
+# Upsample
+logit_us <- upSample(x = home_class, y = home_class$Pobre, yname = "Pobre")
+dim(training)
+
+dim(logit_us)
+
+table(logit_us$Pobre)
+
+logit_us_caret <- train(Pobre ~ P5000 + P5010 + Nper + P6020 + P6040 + P6090_n + 
+                         P6210s1_n + P6585s1_n + P6585s3_n + P6920_n + P7495_n, 
+                       data = logit_us, 
+                       method = "glm",
+                       trControl = ctrl,
+                       family = "binomial", 
+                       metric = 'ROC')
+logit_us_caret
+
 
 # LDA --------------------------------------------------------------------------
 
 #Modelo de prueba
 
 lda.fit <- lda(
-  Pobre ~ P5000 + Nper + P6210s1 + Ingtot + P6050,
-  data = train_merge)
+  Pobre ~ Clase.x + P6020 + P6040 + I(P6040^2) + P6090_2 + P6210_1
+  + P6210_2 + P6210_3 + P6210_4+ P6210_5 + P6240_2+ P6240_3+ P6240_4
+  + P6240_5+ P6240_6 + P7495_2 + P7505_1 + P5000 + P5010 + Nper 
+  + Npersug + P5090_2 + P5090_3 + P5090_4 + P5090_5 + P5090_6,
+  data = home_class)
 lda.fit
-plot(lda.fit)
-lda.pred <- predict(lda.fit, train_merge)
+lda.pred <- predict(lda.fit, home_class)
 lda.class <- lda.pred$class
-table(lda.class, test_merge$Pobre)
+table(lda.class, home_class$Pobre)
 (338454+16400)/(338454+16400+83371+9434)
 
 # Modelo 1
 lda.fit <- lda(
-  Pobre ~ P5000 + P5010 + Nper + P6020 + P6040 + P6090_n + P6210s1_n + P6585s1_n + P6585s3_n + P6920_n + P6050,
-  data = train_prueba)
+  Pobre ~ P5000 + I(P5000^2)+ P5010 + I(P5010^2) + Nper + I(Nper^2) + 
+    P6020 + P6040 + I(P6040^2) + P6090_n + P6210_n + P6210s1_n
+    + P6585s1_n + P6585s3_n + P6920_n + P7495_n,
+  data = home_class)
 lda.fit
-lda.pred <- predict(lda.fit, train_prueba)
+lda.pred <- predict(lda.fit, home_class)
 lda.class <- lda.pred$class
-table(lda.class, train_prueba$Pobre)
+table(lda.class, home_class$Pobre)
 (23803+602)/(23803+602+1106+780)
 
 # Modelo 2
