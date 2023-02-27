@@ -218,7 +218,7 @@ aux <- train[, 2:46]
 undersample <- downSample(x = aux[, -ncol(aux)], y = as.factor(aux$poor))
 
 # Revisar correcion de balance
-hist(as.numeric(undersample$poor), col="coral")
+hist(as.numeric(undersample$poor), col="coral", main="Balance de Clases: UnderSample", xlab="Pobre", ylab="Frecuencia")
 prop.table(table(undersample$poor))
 
 #2. SMOTE
@@ -231,7 +231,7 @@ names(smote)[names(smote) == "class"] <- "poor"
 
 
 # Revisar correcion de balance
-hist(as.numeric(smote$poor), col="coral")
+hist(as.numeric(smote$poor), col="coral", main="Balance de Clases: SMOTE", xlab="Pobre", ylab="Frecuencia")
 prop.table(table(smote$poor))
 
 #3. Undersampling para hogares
@@ -641,4 +641,4 @@ m6_pred[m6_probs < kaggle_h$lp] <- 1
 export <- cbind(kaggle_h$id, m6_pred)
 export <- as.data.frame(export)
 colnames(export) <- c("id", "pobre")
-write.csv(export, "C:\\Users\\Usuario\\Downloads", row.names=FALSE)
+write.csv(export, "C:\\Users\\Usuario\\Downloads\\forest.csv", row.names=FALSE)
