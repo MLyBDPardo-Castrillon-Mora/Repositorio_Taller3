@@ -231,7 +231,7 @@ names(smote)[names(smote) == "class"] <- "poor"
 
 
 # Revisar correcion de balance
-hist(as.numeric(smote$poor), col="coral", main="Balance de Clases: SMOTE", xlab="Pobre", ylab="Frecuencia")
+hist(as.numeric(smote$poor), col="coral", main="Balance de Clases: SMOTE", xlab = "Pobre", ylab = "Frecuencia")
 prop.table(table(smote$poor))
 
 #3. Undersampling para hogares
