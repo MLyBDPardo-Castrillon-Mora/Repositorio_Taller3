@@ -1,18 +1,16 @@
 # LIBRERIAS ====================================================================
-library(caret)
-library(dplyr)
-library(leaflet)
-library(MASS)
-library(osmdata)
 library(pacman)
-library(plotly)
-library(randomForest)
-library(rgeos)
-library(sf)
-library(SuperLearner)
-library(tidyverse)
-library(tmaptools)
-
+p_load(caret,
+       tidverse,
+       leaflet,
+       MASS,
+       osmdata,
+       plotly,
+       randomforest,
+       rgeos,
+       sf,
+       SuperLearner,
+       tmaptools)
 
 # DATOS ========================================================================
 # Base de datos ----------------------------------------------------------------
@@ -24,8 +22,8 @@ set.seed(4040)
 memory.limit(100000)
 
 # Importacion de datos
-db <- read.csv("~/uniandes-bdml-20231-ps3/train.csv")
-kaggle <- read.csv("~/uniandes-bdml-20231-ps3/test.csv")
+db <- read.csv("./Stores/train.csv")
+kaggle <- read.csv("./Stores/test.csv")
 
 # Split de datos
 db$obs <- 1:nrow(db)
