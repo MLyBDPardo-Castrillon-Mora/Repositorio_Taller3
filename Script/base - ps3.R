@@ -1,12 +1,12 @@
 # LIBRERIAS ====================================================================
 library(pacman)
 p_load(caret,
-       tidverse,
+       tidyverse,
        leaflet,
        MASS,
        osmdata,
        plotly,
-       randomforest,
+       randomForest,
        rgeos,
        sf,
        SuperLearner,
@@ -38,13 +38,14 @@ dev_set <- dev_set[-indices, ]
 # Ver base de datos
 glimpse(db)
 
+as.factor(db$property_type)
 summary(db$price) %>%
   as.matrix() %>%
   as.data.frame() %>%
   mutate(V1 = scales::dollar(V1))
 
 # Distribucion de precios
-p <- ggplot(db, aes(x = price)) +
+hist_precios <- ggplot(db, aes(x = price)) +
   geom_histogram(fill = "coral", alpha = 0.4) +
   labs(x = "Precio (log-scale)", y = "Frecuencia") +
   scale_x_log10(labels = scales::dollar) +
@@ -227,6 +228,36 @@ db$dmin_rest <- dmin_rest
 db$dmin_school <- dmin_school
 db$dmin_tm <- dmin_tm
 
+# Calcular densidades de distancias
+park_density <- density(db$dmin_park)
+gym_density <- density(db$dmin_gym)
+hosp_density <- density(db$dmin_hosp)
+bar_density <- density(db$dmin_bar)
+malls_density <- density(db$dmin_malls)
+rest_density <- density(db$dmin_rest)
+tm_density <- density(db$dmin_school)
+
+densidades <- data.frame(x = tm_density$x, park = park_density$y,
+                         gym = gym_density$y,
+                         hosp = hosp_density$y,
+                         bar = bar_density$y,
+                         malls = malls_density$y,
+                         rest = rest_density$y,
+                         tm = tm_density$y)
+
+ggplot(data = densidades, aes(x = x)) +
+  labs(x = "Distancia de apartamentos a distintas zonas urbanas", y = "Densidad") + theme_bw() +
+  geom_line(aes(y = gym, color = "Gimnasios")) +
+  geom_line(aes(y = hosp, color = "Hospitales")) +
+  geom_line(aes(y = bar, color = "Bares")) +
+  geom_line(aes(y = malls, color = "C.C.")) +
+  geom_line(aes(y = rest, color = "Restaurantes")) +
+  geom_line(aes(y = tm, color = "Transmilenio")) +
+  scale_color_manual(name = "Lugar", values = c("Gimnasios"="red",
+                                                    "Hospitales" = "purple","Bares" = "darkblue",
+                                                    "C.C." = "black","Restaurantes" = "darkgreen",
+                                                    "Transmilenio" = "orange")) -> hist_ammen
+
 # Palabras Clave ---------------------------------------------------------------
 
 # Garaje
@@ -262,6 +293,9 @@ for (i in 1:nrow(db)) {
   }
 }
 
+chapinero <- getbb(place_name = "UPZ Chapinero, Bogota",
+                   featuretype = "boundary:administrative",
+                   format_out = "sf_polygon") %>% .$multipolygon
 
 house_chapi <- st_intersection(x = db_sf, y = chapinero)
 
@@ -281,10 +315,33 @@ leaflet() %>%
 
 
 # MODELOS ======================================================================
+db_temp <- db
+# NA de surface
+db_temp$property_type<-factor(db_temp$property_type, levels=c("Apartamento","Casa"), labels = c(0,1))
+db_temp$property_type<-as.numeric(db_temp$property_type)
+aux <- subset(db, select = c("surface_total", "property_type", "bedrooms", "balcon", "ascensor","deposito","garaje", "dmin_tm","dmin_hosp","dmin_park"))
+lm_model <- rpart(surface_total ~ .
+               + I(bedrooms^2)+ I(bedrooms^3)+ I(bedrooms^4)+ I(bedrooms^5)
+               + I(dmin_tm^2)+ I(dmin_tm^3)+ I(dmin_tm^4)+ I(dmin_tm^5)
+               + I(dmin_hosp^2)+ I(dmin_hosp^3)+ I(dmin_hosp^4)+ I(dmin_hosp^5), data = aux)
+aux$surface[is.na(aux$surface)] <- predict(lm_model, newdata = aux[is.na(aux$surface), ])
+db_temp$surface <- aux$surface
+summary(db_temp$surface)
+summary(db_temp$surface_total)
 
+#Super Learner ===============================================================
+Ysl <- db$price
+Xsl <- db %>% select(dmin_bar,dmin_gym,dmin_hosp,dmin_tm,garaje,ascensor)
+
+Modelos <- c("SL.randomForest", "SL.lm")
+
+fitY <- SuperLearner(Y = Ysl,  X= data.frame(Xsl),
+                     method = "method.NNLS", # combinación convexa
+                     SL.library = Modelos)
 
 # EXPORT =======================================================================
-
+ggsave("hist_precios.png", path = "./Views")
+ggsave("hist_ammen.png", path="./Views")
 # Expandir Base de datos de Kaggle
 
 # Distancias -------------------------------------------------------------------
