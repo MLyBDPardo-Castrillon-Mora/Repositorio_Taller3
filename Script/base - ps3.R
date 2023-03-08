@@ -1,16 +1,19 @@
 # LIBRERIAS ====================================================================
+rm(list = ls())
+
 library(pacman)
-p_load(caret,
-       tidyverse,
-       leaflet,
-       MASS,
-       osmdata,
-       plotly,
-       randomForest,
-       rgeos,
-       sf,
-       SuperLearner,
-       tmaptools)
+p_load(caret, # Clasificación y regresión
+       tidyverse, # Manejo de Datos
+       leaflet, # Mapas interactivos
+       MASS, 
+       osmdata, # Street Map Data
+       plotly, # Mapeo y graficos
+       randomForest, # modetosRandom Forest
+       rgeos, # Regex
+       sf, # Objetos Espaciales
+       SuperLearner, #Modelo Super Learner
+       tmaptools, # Herramientas de mapeo
+       stargazer) #Tablas de regresiones
 
 # DATOS ========================================================================
 # Base de datos ----------------------------------------------------------------
@@ -38,7 +41,6 @@ dev_set <- dev_set[-indices, ]
 # Ver base de datos
 glimpse(db)
 
-as.factor(db$property_type)
 summary(db$price) %>%
   as.matrix() %>%
   as.data.frame() %>%
@@ -48,9 +50,9 @@ summary(db$price) %>%
 hist_precios <- ggplot(db, aes(x = price)) +
   geom_histogram(fill = "coral", alpha = 0.4) +
   labs(x = "Precio (log-scale)", y = "Frecuencia") +
-  scale_x_log10(labels = scales::dollar) +
+  scale_x_continuous(labels = scales::dollar) +
   theme_bw()
-ggplotly(p)
+ggplotly(hist_precios)
 
 # Expandir base de datos -------------------------------------------------------
 
@@ -258,6 +260,67 @@ ggplot(data = densidades, aes(x = x)) +
                                                     "C.C." = "black","Restaurantes" = "darkgreen",
                                                     "Transmilenio" = "orange")) -> hist_ammen
 
+scatter_p_tm <- ggplot(db, aes(x = dmin_park, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_tm.png",path = "./Views")
+
+scatter_p_park <-ggplot(db, aes(x = dmin_park, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_park.png",path = "./Views")
+
+scatter_p_rest <- ggplot(db, aes(x = dmin_rest, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_rest.png",path = "./Views")
+
+scatter_p_bar <- ggplot(db, aes(x = dmin_bar, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_bar.png", path = "./Views")
+
+scatter_p_mall <- ggplot(db, aes(x = dmin_malls, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_mall.png", path = "./Views")
+
+scatter_p_hosp <- ggplot(db, aes(x = dmin_hosp, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_hosp.png", path = "./Views")
+
+
 # Palabras Clave ---------------------------------------------------------------
 
 # Garaje
@@ -331,7 +394,7 @@ summary(db_temp$surface_total)
 
 #Super Learner ===============================================================
 Ysl <- db$price
-Xsl <- db %>% select(dmin_bar,dmin_gym,dmin_hosp,dmin_tm,garaje,ascensor)
+Xsl <- db %>% select(dmin_bar)#dmin_gym,dmin_hosp,dmin_tm,garaje,ascensor)
 
 Modelos <- c("SL.randomForest", "SL.lm")
 
@@ -342,6 +405,14 @@ fitY <- SuperLearner(Y = Ysl,  X= data.frame(Xsl),
 # EXPORT =======================================================================
 ggsave("hist_precios.png", path = "./Views")
 ggsave("hist_ammen.png", path="./Views")
+
+stargazer(db[c("bedrooms","rooms","bathrooms","surface_total","surface_covered","price")], digits=1,
+          covariate.labels = c("Dormitorios","Habitaciones","Baños","Área Total","Área Cubierta","precio"),
+          summary.stat = c("n","mean","sd","min","p25","median","p75","max"),
+          type = "latex", title = "Estadisticas Descriptivas")
+
+stargazer(db[c("price")],summary.stat = c("n","mean","sd","min","p25","median","p75","max"), type="latex",
+          flip=T, title = "Variable Respuesta",digits=0)
 # Expandir Base de datos de Kaggle
 
 # Distancias -------------------------------------------------------------------
@@ -391,6 +462,7 @@ for (i in 1:nrow(kaggle)) {
 
 # Deposito
 kaggle$deposito <- rep(0,nrow(kaggle))
+
 for (i in 1:nrow(kaggle)) {
   if (grepl("(?i)\\b(deposito(s)?)\\b", kaggle$description[i], perl=TRUE)) {
     kaggle$deposito[i] <- 1
