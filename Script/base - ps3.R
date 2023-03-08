@@ -249,13 +249,14 @@ densidades <- data.frame(x = tm_density$x, park = park_density$y,
 
 ggplot(data = densidades, aes(x = x)) +
   labs(x = "Distancia de apartamentos a distintas zonas urbanas", y = "Densidad") + theme_bw() +
+  geom_line(aes(y = park, color = "Parques")) +
   geom_line(aes(y = gym, color = "Gimnasios")) +
   geom_line(aes(y = hosp, color = "Hospitales")) +
   geom_line(aes(y = bar, color = "Bares")) +
   geom_line(aes(y = malls, color = "C.C.")) +
   geom_line(aes(y = rest, color = "Restaurantes")) +
   geom_line(aes(y = tm, color = "Transmilenio")) +
-  scale_color_manual(name = "Lugar", values = c("Gimnasios"="red",
+  scale_color_manual(name = "Lugar", values = c("Parques" = "gray","Gimnasios"="red",
                                                     "Hospitales" = "purple","Bares" = "darkblue",
                                                     "C.C." = "black","Restaurantes" = "darkgreen",
                                                     "Transmilenio" = "orange")) -> hist_ammen
