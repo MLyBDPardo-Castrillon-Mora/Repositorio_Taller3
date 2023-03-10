@@ -1,6 +1,7 @@
 # LIBRERIAS ====================================================================
 library(caret)
 library(dplyr)
+library(gbm)
 library(glmnet)
 library(leaflet)
 library(MASS)
@@ -327,7 +328,7 @@ for (i in 1:nrow(db)) {
   }
 }
 
-# Planta
+# Planta electrica
 db$planta <- rep(0,nrow(db))
 for (i in 1:nrow(db)) {
   if (grepl("(?i)\\b(planta|generador)\\b", db$description[i], perl=TRUE)) {
@@ -351,6 +352,30 @@ for (i in 1:nrow(db)) {
   }
 }
 
+# Conjunto
+db$conjunto <- rep(0,nrow(db))
+for (i in 1:nrow(db)) {
+  if (grepl("(?i)\\b(conjunto)\\b", db$description[i], perl=TRUE)) {
+    db$conjunto[i] <- 1
+  }
+}
+
+# Chimenea
+db$chimenea <- rep(0,nrow(db))
+for (i in 1:nrow(db)) {
+  if (grepl("(?i)\\b(chimenea)\\b", db$description[i], perl=TRUE)) {
+    db$chimenea[i] <- 1
+  }
+}
+
+# Smart Building
+db$smart <- rep(0,nrow(db))
+for (i in 1:nrow(db)) {
+  if (grepl("(?i)\\b(smart|inteligente)\\b", db$description[i], perl=TRUE)) {
+    db$smart[i] <- 1
+  }
+}
+
 
 # Dummies ----------------------------------------------------------------------
 
@@ -358,7 +383,7 @@ for (i in 1:nrow(db)) {
 db$casa <- rep(0,nrow(db))
 db$casa <- ifelse (db$property_type == "Casa", 1, 0)
 
-
+# MISC -------------------------------------------------------------------------
 
 house_chapi <- st_intersection(x = db_sf, y = chapinero)
 
@@ -381,12 +406,15 @@ leaflet() %>%
 
 # Regresion lineal
 
-model.1 <- lm(price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + dmin_malls + dmin_park
-              + dmin_rest + dmin_school + dmin_tm + garaje + deposito + balcon
-              + ascensor + casa, data = db)
+model.1 <- glm(price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + 
+                I(dmin_hosp^2) + dmin_malls + dmin_park + dmin_rest 
+              + dmin_school + dmin_tm + I(dmin_tm^2) + dmin_casino 
+              + dmin_disco + dmin_policia + I(dmin_policia^2)
+              + garaje + deposito + balcon + ascensor + casa 
+              + planta + seg + conjunto + vista + chimenea 
+              + smart, data = db)
 
-summary_m1 <- summary(model.1)
-stargazer(summary_m1, type = "text", title = "Regresion Lineal")
+summary(model.1)
 m1 <- predict(model.1)
 mae_1 <- mean(abs(db$price - m1))
 
@@ -416,33 +444,55 @@ m2 <- predict(model.2)
 mse_2 <- mean((db$price - m2)^2)
 
 
-# Random Forest
-
-# Control
-ctrl <- trainControl(method = "cv",
-                     number = 5, 
-                     verboseIter = FALSE, 
-                     savePredictions = TRUE)
-# Grid
-grid <- expand.grid(mtry = c(2))
-
-# Random Forest
-model.3 <- train(price ~ dmin_bar + dmin_gym + dmin_hosp + dmin_malls + dmin_park +
-                   dmin_rest + dmin_school + dmin_tm + garaje + deposito + balcon +
-                   ascensor + casa,
-                 data = db,
-                 method = "rf",
-                 trControl = ctrl,
-                 tuneGrid = grid,
-                 importance = TRUE)
-
-model.3 <- randomForest(price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + 
-                          dmin_malls + dmin_park + dmin_rest + dmin_school + 
-                          dmin_tm + garaje + deposito + balcon + ascensor + 
-                          casa, data = db, ntree = 250)
+# Random Forests
+model.3 <- randomForest (price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + 
+                             + dmin_malls + dmin_park + dmin_rest + dmin_school 
+                             + dmin_tm + dmin_casino + dmin_disco + dmin_policia
+                             + garaje + deposito + balcon + ascensor + casa 
+                             + planta + seg + conjunto + vista + chimenea 
+                             + smart, data = db, ntree = 100)
 
 m3 <- predict(model.3)
 mae_3 <- mean(abs(db$price - m3))
+
+model.4 <- randomForest (price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + 
+                           I(dmin_hosp^2) + dmin_malls + dmin_park + dmin_rest 
+                         + dmin_school + dmin_tm + I(dmin_tm^2) + dmin_casino 
+                         + dmin_disco + dmin_policia + I(dmin_policia^2)
+                         + garaje + deposito + balcon + ascensor + casa 
+                         + planta + seg + conjunto + vista + chimenea 
+                         + smart, data = db, ntree = 250)
+
+m4 <- predict(model.4)
+mae_4 <- mean(abs(db$price - m4))
+
+# Boosting
+model.5 <- gbm(price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + 
+                           I(dmin_hosp^2) + dmin_malls + dmin_park + dmin_rest 
+                         + dmin_school + dmin_tm + I(dmin_tm^2) + dmin_casino 
+                         + dmin_disco + dmin_policia + I(dmin_policia^2)
+                         + garaje + deposito + balcon + ascensor + casa 
+                         + planta + seg + conjunto + vista + chimenea 
+                         + smart, data = db, n.trees = 250, interaction.depth = 3,
+                         shrinkage = 0.1, distribution = "gaussian")
+
+m5 <- predict(model.5)
+mae_5 <- mean(abs(db$price - m5))
+
+
+# SUPER-LEARNER ================================================================
+
+# Definir learners y precio
+x <- db  %>% select(bedrooms, dmin_bar, dmin_gym, dmin_hosp, dmin_malls, 
+                    dmin_park, dmin_rest, dmin_school, dmin_tm, dmin_casino, 
+                    dmin_disco, dmin_policia, garaje, deposito, balcon,
+                    ascensor, casa, planta, seg, conjunto, vista, chimenea, smart)
+y <- db$price
+
+# Super learner
+sl.lib <- c("SL.randomForest", "SL.lm")
+
+fit_Y <- SuperLearner(Y = y,  X= x, method = "method.NNLS", SL.library = sl.lib)
 
 
 # EXPORT =======================================================================
