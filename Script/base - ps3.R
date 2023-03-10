@@ -5,6 +5,7 @@ library(glmnet)
 library(leaflet)
 library(MASS)
 library(osmdata)
+library(osmtools)
 library(pacman)
 library(plotly)
 library(randomForest)
@@ -54,6 +55,8 @@ ggplotly(p)
 
 # Expandir base de datos -------------------------------------------------------
 
+available_features()
+
 parques <- opq(bbox = getbb("Bogota Colombia")) %>%
   add_osm_feature(key = "leisure" , value = "park") 
 parques_sf <- osmdata_sf(parques)
@@ -101,6 +104,51 @@ malls <- opq(bbox = getbb("Bogota Colombia")) %>%
 malls_sf <- osmdata_sf(malls)
 malls_geometria <- malls_sf$osm_polygons %>% 
   select(osm_id, name)
+
+atms <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "amenity" , value = "atm") 
+atms_sf <- osmdata_sf(atms)
+atms_geometria <- atms_sf$osm_polygons %>% 
+  select(osm_id, name)
+
+policia <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "amenity" , value = "police") 
+policia_sf <- osmdata_sf(policia)
+policia_geometria <- policia_sf$osm_polygons %>% 
+  select(osm_id, name)
+
+disco <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "amenity" , value = "nightclub") 
+disco_sf <- osmdata_sf(disco)
+disco_geometria <- disco_sf$osm_polygons %>% 
+  select(osm_id, name)
+
+motel <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "amenity" , value = "love_hotel") 
+motel_sf <- osmdata_sf(motel)
+motel_geometria <- motel_sf$osm_polygons %>% 
+  select(osm_id, name)
+
+boutique <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "shop" , value = "boutique") 
+boutique_sf <- osmdata_sf(boutique)
+boutique_geometria <- boutique_sf$osm_polygons %>% 
+  select(osm_id, name)
+
+arte <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "amenity" , value = "arts_centre") 
+arte_sf <- osmdata_sf(arte)
+arte_geometria <- arte_sf$osm_polygons %>% 
+  select(osm_id, name)
+
+casino <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "amenity" , value = "casino") 
+casino_sf <- osmdata_sf(casino)
+casino_geometria <- casino_sf$osm_polygons %>% 
+  select(osm_id, name)
+
+
+
 
 # Centroides -------------------------------------------------------------------
 
@@ -262,6 +310,31 @@ for (i in 1:nrow(db)) {
     db$ascensor[i] <- 1
   }
 }
+
+# Planta
+db$planta <- rep(0,nrow(db))
+for (i in 1:nrow(db)) {
+  if (grepl("(?i)\\b(planta|generador)\\b", db$description[i], perl=TRUE)) {
+    db$planta[i] <- 1
+  }
+}
+
+# Seguridad
+db$seg <- rep(0,nrow(db))
+for (i in 1:nrow(db)) {
+  if (grepl("(?i)\\b(vigilancia|seguridad)\\b", db$description[i], perl=TRUE)) {
+    db$seg[i] <- 1
+  }
+}
+
+# Vista
+db$vista <- rep(0,nrow(db))
+for (i in 1:nrow(db)) {
+  if (grepl("(?i)\\b(vista)\\b", db$description[i], perl=TRUE)) {
+    db$vista[i] <- 1
+  }
+}
+
 
 # Dummies ----------------------------------------------------------------------
 
