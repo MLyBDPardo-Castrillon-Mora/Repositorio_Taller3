@@ -105,12 +105,6 @@ malls_sf <- osmdata_sf(malls)
 malls_geometria <- malls_sf$osm_polygons %>% 
   select(osm_id, name)
 
-atms <- opq(bbox = getbb("Bogota Colombia")) %>%
-  add_osm_feature(key = "amenity" , value = "atm") 
-atms_sf <- osmdata_sf(atms)
-atms_geometria <- atms_sf$osm_polygons %>% 
-  select(osm_id, name)
-
 policia <- opq(bbox = getbb("Bogota Colombia")) %>%
   add_osm_feature(key = "amenity" , value = "police") 
 policia_sf <- osmdata_sf(policia)
@@ -123,32 +117,11 @@ disco_sf <- osmdata_sf(disco)
 disco_geometria <- disco_sf$osm_polygons %>% 
   select(osm_id, name)
 
-motel <- opq(bbox = getbb("Bogota Colombia")) %>%
-  add_osm_feature(key = "amenity" , value = "love_hotel") 
-motel_sf <- osmdata_sf(motel)
-motel_geometria <- motel_sf$osm_polygons %>% 
-  select(osm_id, name)
-
-boutique <- opq(bbox = getbb("Bogota Colombia")) %>%
-  add_osm_feature(key = "shop" , value = "boutique") 
-boutique_sf <- osmdata_sf(boutique)
-boutique_geometria <- boutique_sf$osm_polygons %>% 
-  select(osm_id, name)
-
-arte <- opq(bbox = getbb("Bogota Colombia")) %>%
-  add_osm_feature(key = "amenity" , value = "arts_centre") 
-arte_sf <- osmdata_sf(arte)
-arte_geometria <- arte_sf$osm_polygons %>% 
-  select(osm_id, name)
-
 casino <- opq(bbox = getbb("Bogota Colombia")) %>%
   add_osm_feature(key = "amenity" , value = "casino") 
 casino_sf <- osmdata_sf(casino)
 casino_geometria <- casino_sf$osm_polygons %>% 
   select(osm_id, name)
-
-
-
 
 # Centroides -------------------------------------------------------------------
 
@@ -232,6 +205,37 @@ leaflet() %>%
              lat = centro_malls$y, 
              col = "red", opacity = 1, radius = 1)
 
+# Policia
+centro_policia <- gCentroid(as(policia_geometria$geometry, "Spatial"), byid = T)
+leaflet() %>%
+  addTiles() %>%
+  addPolygons(data = policia_geometria, col = "green",
+              opacity = 0.8, popup = policia_geometria$name) %>%
+  addCircles(lng = centro_policia$x, 
+             lat = centro_policia$y, 
+             col = "red", opacity = 1, radius = 1)
+
+# Discotecas
+centro_disco <- gCentroid(as(disco_geometria$geometry, "Spatial"), byid = T)
+leaflet() %>%
+  addTiles() %>%
+  addPolygons(data = disco_geometria, col = "green",
+              opacity = 0.8, popup = disco_geometria$name) %>%
+  addCircles(lng = centro_disco$x, 
+             lat = centro_disco$y, 
+             col = "red", opacity = 1, radius = 1)
+
+# Casinos
+centro_casino <- gCentroid(as(casino_geometria$geometry, "Spatial"), byid = T)
+leaflet() %>%
+  addTiles() %>%
+  addPolygons(data = casino_geometria, col = "green",
+              opacity = 0.8, popup = casino_geometria$name) %>%
+  addCircles(lng = centro_casino$x, 
+             lat = centro_casino$y, 
+             col = "red", opacity = 1, radius = 1)
+
+
 # Distancias -------------------------------------------------------------------
 # Elegir centroides de apartamentos
 db_sf <- st_as_sf(db, coords = c("lon", "lat"))
@@ -245,6 +249,9 @@ centro_malls_sf <- st_as_sf(centro_malls, coords = c("x", "y"))
 centro_rest_sf <- st_as_sf(centro_rest, coords = c("x", "y"))
 centro_school_sf <- st_as_sf(centro_school, coords = c("x", "y"))
 centro_tm_sf <- st_as_sf(centro_tm, coords = c("x", "y"))
+centro_policia_sf <- st_as_sf(centro_policia, coords = c("x", "y"))
+centro_disco_sf <- st_as_sf(centro_disco, coords = c("x", "y"))
+centro_casino_sf <- st_as_sf(centro_casino, coords = c("x", "y"))
 
 # Matrices de distancias
 dist_park <- st_distance(x = db_sf, y = centro_park_sf)
@@ -255,6 +262,9 @@ dist_malls <- st_distance(x = db_sf, y = centro_malls_sf)
 dist_rest <- st_distance(x = db_sf, y = centro_rest_sf)
 dist_school <- st_distance(x = db_sf, y = centro_school_sf)
 dist_tm <- st_distance(x = db_sf, y = centro_tm_sf)
+dist_policia <- st_distance(x = db_sf, y = centro_policia_sf)
+dist_disco <- st_distance(x = db_sf, y = centro_disco_sf)
+dist_casino <- st_distance(x = db_sf, y = centro_casino_sf)
 
 # Distancia minima
 dmin_park <- apply(dist_park, 1, min)
@@ -265,6 +275,9 @@ dmin_malls <- apply(dist_malls, 1, min)
 dmin_rest <- apply(dist_rest, 1, min)
 dmin_school <- apply(dist_school, 1, min)
 dmin_tm <- apply(dist_tm, 1, min)
+dmin_policia <- apply(dist_policia, 1, min)
+dmin_disco <- apply(dist_disco, 1, min)
+dmin_casino <- apply(dist_casino, 1, min)
 
 # Agregar a la base de datos
 db$dmin_park <- dmin_park
@@ -275,6 +288,9 @@ db$dmin_malls <- dmin_malls
 db$dmin_rest <- dmin_rest
 db$dmin_school <- dmin_school
 db$dmin_tm <- dmin_tm
+db$dmin_policia <- dmin_policia
+db$dmin_disco <- dmin_disco
+db$dmin_casino <- dmin_casino
 
 # Palabras Clave ---------------------------------------------------------------
 
