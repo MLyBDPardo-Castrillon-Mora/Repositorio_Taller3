@@ -13,7 +13,8 @@ p_load(caret, # Clasificación y regresión
        sf, # Objetos Espaciales
        SuperLearner, #Modelo Super Learner
        tmaptools, # Herramientas de mapeo
-       stargazer) #Tablas de regresiones
+       stargazer,
+       rpart) #Tablas de regresiones
 
 # DATOS ========================================================================
 # Base de datos ----------------------------------------------------------------
@@ -394,15 +395,23 @@ summary(db_temp$surface)
 summary(db_temp$surface_total)
 
 #Super Learner ===============================================================
-Ysl <- db$price
-Xsl <- db %>% select(dmin_bar)#dmin_gym,dmin_hosp,dmin_tm,garaje,ascensor)
+Ysl <- db_temp$price
+Xsl <- db_temp %>% select(dmin_bar,dmin_gym, dmin_hosp, dmin_malls, dmin_park, bedrooms, garaje, balcon, deposito,)
 
-Modelos <- c("SL.randomForest", "SL.lm")
+Modelos <- c("SL.glm", "SL.rpart","SL.ridge")
 
-fitY <- SuperLearner(Y = Ysl,  X= data.frame(Xsl),
+fitY <- SuperLearner(Y = Ysl,  X = data.frame(Xsl),
                      method = "method.NNLS", # combinación convexa
                      SL.library = Modelos)
 
+print("SE LOGRO AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+
+
+
+kaggle <- kaggle  %>%  mutate(price = predict(fitY, newdata = data.frame(kaggle), onlySL = T)$pred)
+kaggle_final <- kaggle %>% select(property_id,price)
+
+write.csv(kaggle_final, "./Stores/prueba.csv", row.names=F)
 # EXPORT =======================================================================
 ggsave("hist_precios.png", path = "./Views")
 ggsave("hist_ammen.png", path="./Views")
