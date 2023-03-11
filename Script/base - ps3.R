@@ -376,12 +376,60 @@ for (i in 1:nrow(db)) {
   }
 }
 
+# Area
+db$area <- rep(0,nrow(db))
+for (i in 1:nrow(db)) {
+  if (grepl("(?i)\\b(m|area|m2|mt2|mts|mts2|metro|metros)\\b", db$description[i], perl=TRUE)) {
+    db$area[i] <- 1
+  }
+}
+db$area <- ifelse(grepl("\\d+(m|area|m2|mts|mts2|metro|metros)", db$description), 1, db$area)
+
+db$area_number <- sapply(
+  str_extract_all(db$description, 
+                  "\\d+(\\.\\d+)?\\s?(m|m2|mts|mtrs|mts2|metro|metros)"), 
+  function(x) {
+  if (length(x) > 0) {
+    max(as.numeric(gsub("\\D", "", x)))
+  } else {
+    NA
+  }
+})
+db$area_number <- ifelse(db$area_number < 45, NA, db$area_number)
+
+m.aux <- randomForest (area_number ~ balcon + ascensor + casa + planta + vista
+                       + chimenea + bedrooms, data = db, ntree = 500, 
+                       na.action = na.omit)
+m_aux <- predict(m.aux, newdata = db)
+db$area_number <- ifelse(is.na(db$area_number==TRUE), m_aux[i], db$area_number)
 
 # Dummies ----------------------------------------------------------------------
 
 # Dummy de casa
 db$casa <- rep(0,nrow(db))
 db$casa <- ifelse (db$property_type == "Casa", 1, 0)
+
+# Dummies de trimestre y ano
+db$tr1 <- rep(0,nrow(db))
+db$tr1 <- ifelse (db$month == "1"|db$month == "2"|db$month == "3", 1, 0)
+
+db$tr2 <- rep(0,nrow(db))
+db$tr2 <- ifelse (db$month == "4"|db$month == "5"|db$month == "6", 1, 0)
+
+db$tr3 <- rep(0,nrow(db))
+db$tr3 <- ifelse (db$month == "7"|db$month == "8"|db$month == "9", 1, 0)
+
+db$tr4 <- rep(0,nrow(db))
+db$tr4 <- ifelse (db$month == "10"|db$month == "11"|db$month == "12", 1, 0)
+
+db$y_19 <- rep(0,nrow(db))
+db$y_19 <- ifelse (db$year == "2019", 1, 0)
+
+db$y_20 <- rep(0,nrow(db))
+db$y_20 <- ifelse (db$year == "2020", 1, 0)
+
+db$y_21 <- rep(0,nrow(db))
+db$y_21 <- ifelse (db$year == "2021", 1, 0)
 
 # MISC -------------------------------------------------------------------------
 
@@ -513,6 +561,9 @@ kdist_malls <- st_distance(x = ka_sf, y = centro_malls_sf)
 kdist_rest <- st_distance(x = ka_sf, y = centro_rest_sf)
 kdist_school <- st_distance(x = ka_sf, y = centro_school_sf)
 kdist_tm <- st_distance(x = ka_sf, y = centro_tm_sf)
+kdist_policia <- st_distance(x = ka_sf, y = centro_policia_sf)
+kdist_casino <- st_distance(x = ka_sf, y = centro_casino_sf)
+kdist_disco <- st_distance(x = ka_sf, y = centro_disco_sf)
 
 # Distancia minima
 kdmin_park <- apply(kdist_park, 1, min)
@@ -523,6 +574,9 @@ kdmin_malls <- apply(kdist_malls, 1, min)
 kdmin_rest <- apply(kdist_rest, 1, min)
 kdmin_school <- apply(kdist_school, 1, min)
 kdmin_tm <- apply(kdist_tm, 1, min)
+kdmin_policia <- apply(kdist_policia, 1, min)
+kdmin_disco <- apply(kdist_disco, 1, min)
+kdmin_casino <- apply(kdist_casino, 1, min)
 
 # Agregar a la base de datos
 kaggle$dmin_park <- kdmin_park
@@ -533,6 +587,9 @@ kaggle$dmin_malls <- kdmin_malls
 kaggle$dmin_rest <- kdmin_rest
 kaggle$dmin_school <- kdmin_school
 kaggle$dmin_tm <- kdmin_tm
+kaggle$dmin_policia <- kdmin_policia
+kaggle$dmin_casino <- kdmin_casino
+kaggle$dmin_disco <- kdmin_disco
 
 # Palabras Clave ---------------------------------------------------------------
 
@@ -572,7 +629,85 @@ for (i in 1:nrow(kaggle)) {
 kaggle$casa <- rep(0,nrow(kaggle))
 kaggle$casa <- ifelse (kaggle$property_type == "Casa", 1, 0)
 
+# Planta electrica
+kaggle$planta <- rep(0,nrow(kaggle))
+for (i in 1:nrow(kaggle)) {
+  if (grepl("(?i)\\b(planta|generador)\\b", kaggle$description[i], perl=TRUE)) {
+    kaggle$planta[i] <- 1
+  }
+}
+
+# Seguridad
+kaggle$seg <- rep(0,nrow(kaggle))
+for (i in 1:nrow(kaggle)) {
+  if (grepl("(?i)\\b(vigilancia|seguridad)\\b", kaggle$description[i], perl=TRUE)) {
+    kaggle$seg[i] <- 1
+  }
+}
+
+# Vista
+kaggle$vista <- rep(0,nrow(kaggle))
+for (i in 1:nrow(kaggle)) {
+  if (grepl("(?i)\\b(vista)\\b", kaggle$description[i], perl=TRUE)) {
+    kaggle$vista[i] <- 1
+  }
+}
+
+# Conjunto
+kaggle$conjunto <- rep(0,nrow(kaggle))
+for (i in 1:nrow(kaggle)) {
+  if (grepl("(?i)\\b(conjunto)\\b", kaggle$description[i], perl=TRUE)) {
+    kaggle$conjunto[i] <- 1
+  }
+}
+
+# Chimenea
+kaggle$chimenea <- rep(0,nrow(kaggle))
+for (i in 1:nrow(kaggle)) {
+  if (grepl("(?i)\\b(chimenea)\\b", kaggle$description[i], perl=TRUE)) {
+    kaggle$chimenea[i] <- 1
+  }
+}
+
+# Smart Building
+kaggle$smart <- rep(0,nrow(kaggle))
+for (i in 1:nrow(kaggle)) {
+  if (grepl("(?i)\\b(smart|inteligente)\\b", kaggle$description[i], perl=TRUE)) {
+    kaggle$smart[i] <- 1
+  }
+}
+
+# Area
+kaggle$smart <- rep(0,nrow(kaggle))
+for (i in 1:nrow(kaggle)) {
+  if (grepl("(?i)\\b(area)\\b", kaggle$description[i], perl=TRUE)) {
+    kaggle$smart[i] <- 1
+  }
+}
+
+# Dummies de trimestre y ano
+kaggle$tr1 <- rep(0,nrow(kaggle))
+kaggle$tr1 <- ifelse (kaggle$month == "1"|kaggle$month == "2"|kaggle$month == "3", 1, 0)
+
+kaggle$tr2 <- rep(0,nrow(kaggle))
+kaggle$tr2 <- ifelse (kaggle$month == "4"|kaggle$month == "5"|kaggle$month == "6", 1, 0)
+
+kaggle$tr3 <- rep(0,nrow(kaggle))
+kaggle$tr3 <- ifelse (kaggle$month == "7"|kaggle$month == "8"|kaggle$month == "9", 1, 0)
+
+kaggle$tr4 <- rep(0,nrow(kaggle))
+kaggle$tr4 <- ifelse (kaggle$month == "10"|kaggle$month == "11"|kaggle$month == "12", 1, 0)
+
+kaggle$y_19 <- rep(0,nrow(kaggle))
+kaggle$y_19 <- ifelse (kaggle$year == "2019", 1, 0)
+
+kaggle$y_20 <- rep(0,nrow(kaggle))
+kaggle$y_20 <- ifelse (kaggle$year == "2020", 1, 0)
+
+kaggle$y_21 <- rep(0,nrow(kaggle))
+kaggle$y_21 <- ifelse (kaggle$year == "2021", 1, 0)
+
 export <- as.data.frame(kaggle$property_id)
-export$price <- predict(model.3, newdata = kaggle)
+export$price <- predict(model.4, newdata = kaggle)
 colnames(export)[1] <- "property_id"
-write.csv(export, "C:/Users/Usuario/Documents/prueba_2.csv", row.names = FALSE)
+write.csv(export, "C:/Users/Usuario/Documents/prueba_4.csv", row.names = FALSE)
