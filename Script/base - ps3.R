@@ -37,12 +37,13 @@ summary(db$price) %>%
   mutate(V1 = scales::dollar(V1))
 
 # Distribucion de precios
-p <- ggplot(db, aes(x = price)) +
+hist_precios <- ggplot(db, aes(x = price)) +
   geom_histogram(fill = "coral", alpha = 0.4) +
   labs(x = "Precio (log-scale)", y = "Frecuencia") +
   scale_x_log10(labels = scales::dollar) +
   theme_bw()
 ggplotly(p)
+ggsave("hist_precios.png", path = "./Views")
 
 # Expandir base de datos -------------------------------------------------------
 
@@ -227,16 +228,6 @@ leaflet() %>%
              col = "red", opacity = 1, radius = 1)
 
 
-###### TEMPLATE DE MAPA INTERACTIVO ######
-# leaflet() %>%
-#   addTiles() %>%
-#   addPolygons(data = <VARIABLE>_geometria, col = "green",
-#               opacity = 0.8, popup = <VARIABLE>_geometria$name) %>%
-#   addCircles(lng = centro_<VARIABLE>$x, 
-#              lat = centro_park$y, 
-#              col = "red", opacity = 1, radius = 1)
-
-
 # Distancias -------------------------------------------------------------------
 # Elegir centroides de apartamentos
 db_sf <- st_as_sf(db, coords = c("lon", "lat"))
@@ -292,6 +283,97 @@ db$dmin_tm <- dmin_tm
 db$dmin_policia <- dmin_policia
 db$dmin_disco <- dmin_disco
 db$dmin_casino <- dmin_casino
+
+# Calcular densidades de distancias
+park_density <- density(db$dmin_park)
+gym_density <- density(db$dmin_gym)
+hosp_density <- density(db$dmin_hosp)
+bar_density <- density(db$dmin_bar)
+malls_density <- density(db$dmin_malls)
+rest_density <- density(db$dmin_rest)
+tm_density <- density(db$dmin_school)
+
+densidades <- data.frame(x = tm_density$x, park = park_density$y,
+                         gym = gym_density$y,
+                         hosp = hosp_density$y,
+                         bar = bar_density$y,
+                         malls = malls_density$y,
+                         rest = rest_density$y,
+                         tm = tm_density$y)
+
+ggplot(data = densidades, aes(x = x)) +
+  labs(x = "Distancia de apartamentos a distintas zonas urbanas", y = "Densidad") + theme_bw() +
+  geom_line(aes(y = park, color = "Parques")) +
+  geom_line(aes(y = gym, color = "Gimnasios")) +
+  geom_line(aes(y = hosp, color = "Hospitales")) +
+  geom_line(aes(y = bar, color = "Bares")) +
+  geom_line(aes(y = malls, color = "C.C.")) +
+  geom_line(aes(y = rest, color = "Restaurantes")) +
+  geom_line(aes(y = tm, color = "Transmilenio")) +
+  scale_color_manual(name = "Lugar", values = c("Parques" = "gray","Gimnasios"="red",
+                                                "Hospitales" = "purple","Bares" = "darkblue",
+                                                "C.C." = "black","Restaurantes" = "darkgreen",
+                                                "Transmilenio" = "orange")) -> hist_ammen
+
+scatter_p_tm <- ggplot(db, aes(x = dmin_park, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_tm.png",path = "./Views")
+
+scatter_p_park <-ggplot(db, aes(x = dmin_park, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_park.png",path = "./Views")
+
+scatter_p_rest <- ggplot(db, aes(x = dmin_rest, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_rest.png",path = "./Views")
+
+scatter_p_bar <- ggplot(db, aes(x = dmin_bar, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_bar.png", path = "./Views")
+
+scatter_p_mall <- ggplot(db, aes(x = dmin_malls, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_mall.png", path = "./Views")
+
+scatter_p_hosp <- ggplot(db, aes(x = dmin_hosp, y = price)) +
+  geom_point(col = "darkblue", alpha = 0.1) +
+  geom_smooth(col="lightblue", alpha = 0.8, se=F,method = "lm") + 
+  labs(x = "Distancia mínima (log-scale)", 
+       y = "Valor del inmueble (log-scale)") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  theme_bw()
+ggsave("scatter_p_hosp.png", path = "./Views")
 
 # Palabras Clave ---------------------------------------------------------------
 
