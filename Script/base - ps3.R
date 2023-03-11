@@ -1,22 +1,22 @@
 # LIBRERIAS ====================================================================
-library(caret)
-library(dplyr)
-library(gbm)
-library(glmnet)
-library(leaflet)
-library(MASS)
-library(osmdata)
-library(osmtools)
-library(pacman)
-library(plotly)
-library(randomForest)
-library(rgeos)
-library(sf)
-library(stargazer)
-library(SuperLearner)
-library(tidyverse)
-library(tmaptools)
+rm(list = ls())
 
+library(pacman)
+p_load(osmtools,
+       MASS,
+       leaflet,
+       glmnet,
+       gbm,
+       dplyr,
+       caret,
+       plotly,
+       randomForest,
+       rgeos,
+       sf,
+       stargazer,
+       SuperLearner,
+       tidyverse,
+       tmaptools)
 
 # DATOS ========================================================================
 # Base de datos ----------------------------------------------------------------
@@ -25,18 +25,8 @@ library(tmaptools)
 set.seed(4040)
 
 # Importacion de datos
-db <- read.csv("~/uniandes-bdml-20231-ps3/train.csv")
-kaggle <- read.csv("~/uniandes-bdml-20231-ps3/test.csv")
-
-# Split de datos
-db$obs <- 1:nrow(db)
-indices <- createDataPartition(y = db$obs, p = 0.8, list = FALSE)
-train <- db[indices, ]
-dev_set <- db[-indices, ]
-
-indices <- createDataPartition(y = dev_set$obs, p = 0.5, list = FALSE)
-test <- dev_set[indices, ]
-dev_set <- dev_set[-indices, ]
+db <- read.csv("./Stores/train.csv")
+kaggle <- read.csv("./Stores/test.csv")
 
 # Ver base de datos
 glimpse(db)
@@ -235,6 +225,16 @@ leaflet() %>%
   addCircles(lng = centro_casino$x, 
              lat = centro_casino$y, 
              col = "red", opacity = 1, radius = 1)
+
+
+###### TEMPLATE DE MAPA INTERACTIVO ######
+# leaflet() %>%
+#   addTiles() %>%
+#   addPolygons(data = <VARIABLE>_geometria, col = "green",
+#               opacity = 0.8, popup = <VARIABLE>_geometria$name) %>%
+#   addCircles(lng = centro_<VARIABLE>$x, 
+#              lat = centro_park$y, 
+#              col = "red", opacity = 1, radius = 1)
 
 
 # Distancias -------------------------------------------------------------------
@@ -710,4 +710,4 @@ kaggle$y_21 <- ifelse (kaggle$year == "2021", 1, 0)
 export <- as.data.frame(kaggle$property_id)
 export$price <- predict(model.4, newdata = kaggle)
 colnames(export)[1] <- "property_id"
-write.csv(export, "C:/Users/Usuario/Documents/prueba_4.csv", row.names = FALSE)
+write.csv(export, "./Stores/prueba_4.csv", row.names = FALSE)
