@@ -2,7 +2,7 @@
 rm(list = ls())
 
 library(pacman)
-p_load(osmtools,
+p_load(osmdata,
        MASS,
        leaflet,
        glmnet,
@@ -16,7 +16,8 @@ p_load(osmtools,
        stargazer,
        SuperLearner,
        tidyverse,
-       tmaptools)
+       tmaptools,
+       MLmetrics)
 
 # DATOS ========================================================================
 # Base de datos ----------------------------------------------------------------
@@ -42,7 +43,6 @@ hist_precios <- ggplot(db, aes(x = price)) +
   labs(x = "Precio (log-scale)", y = "Frecuencia") +
   scale_x_log10(labels = scales::dollar) +
   theme_bw()
-ggplotly(p)
 ggsave("hist_precios.png", path = "./Views")
 
 # Expandir base de datos -------------------------------------------------------
@@ -479,6 +479,9 @@ db$area_number <- sapply(
   })
 db$area_number <- ifelse(db$area_number < 45, NA, db$area_number)
 
+db$casa <- rep(0,nrow(db))
+db$casa <- ifelse (db$property_type == "Casa", 1, 0)
+
 m.aux <- randomForest (area_number ~ balcon + ascensor + casa + planta + vista
                        + chimenea + bedrooms, data = db, ntree = 500, 
                        na.action = na.omit)
@@ -514,6 +517,9 @@ db$y_21 <- rep(0,nrow(db))
 db$y_21 <- ifelse (db$year == "2021", 1, 0)
 
 # MISC -------------------------------------------------------------------------
+bogota <- getbb(place_name = "UPZ Chapinero, Bogota", 
+                   featuretype = "boundary:administrative", 
+                   format_out = "sf_polygon") %>% .$multipolygon
 
 house_chapi <- st_intersection(x = db_sf, y = chapinero)
 
@@ -529,7 +535,9 @@ ka_chapi <- st_intersection(x = ka_sf, y = chapinero)
 leaflet() %>% 
   addTiles() %>% 
   addPolygons(data = chapinero , col = "coral") %>%
-  addCircles(data = ka_chapi)
+  addCircles(lng = centro_policia$x, 
+             lat = centro_policia$y, 
+             col = "red", opacity = 1, radius = 1)
 
 
 # MODELOS ======================================================================
@@ -546,7 +554,8 @@ model.1 <- glm(price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp +
 
 summary(model.1)
 m1 <- predict(model.1)
-mae_1 <- mean(abs(db$price - m1))
+scales::dollar(MAE(y_pred = m1, y_true = db$price))
+scales::dollar(RMSE(y_pred = m1, y_true = db$price))
 
 # RIDGE 
 
@@ -571,8 +580,8 @@ model.2 <- train(price ~ dmin_bar + dmin_gym + dmin_hosp + dmin_malls + dmin_par
 
 print(model.2)
 m2 <- predict(model.2)
-mse_2 <- mean((db$price - m2)^2)
-
+scales::dollar(MAE(y_pred = m2, y_true = db$price))
+scales::dollar(RMSE(y_pred = m2, y_true = db$price))
 
 # Random Forests
 model.3 <- randomForest (price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + 
@@ -583,9 +592,10 @@ model.3 <- randomForest (price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp +
                          + smart, data = db, ntree = 100)
 
 m3 <- predict(model.3)
-mae_3 <- mean(abs(db$price - m3))
+scales::dollar(MAE(y_pred = m3, y_true = db$price))
+scales::dollar(RMSE(y_pred = m3, y_true = db$price))
 
-model.4 <- randomForest (price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + 
+model.4 <- randomForest(price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + 
                            I(dmin_hosp^2) + dmin_malls + dmin_park + dmin_rest 
                          + dmin_school + dmin_tm + I(dmin_tm^2) + dmin_casino 
                          + dmin_disco + dmin_policia + I(dmin_policia^2)
@@ -594,7 +604,9 @@ model.4 <- randomForest (price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp +
                          + smart, data = db, ntree = 250)
 
 m4 <- predict(model.4)
-mae_4 <- mean(abs(db$price - m4))
+scales::dollar(MAE(y_pred = m4, y_true = db$price))
+scales::dollar(RMSE(y_pred = m4, y_true = db$price))
+
 
 # Boosting
 model.5 <- gbm(price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp + 
@@ -607,7 +619,9 @@ model.5 <- gbm(price ~ bedrooms + dmin_bar + dmin_gym + dmin_hosp +
                shrinkage = 0.1, distribution = "gaussian")
 
 m5 <- predict(model.5)
-mae_5 <- mean(abs(db$price - m5))
+scales::dollar(MAE(y_pred = m5, y_true = db$price))
+scales::dollar(RMSE(y_pred = m5, y_true = db$price))
+
 
 
 # SUPER-LEARNER ================================================================
@@ -622,7 +636,9 @@ y <- db$price
 # Super learner
 sl.lib <- c("SL.randomForest", "SL.lm")
 
-fit_Y <- SuperLearner(Y = y,  X= x, method = "method.NNLS", SL.library = sl.lib)
+fit_Y <- SuperLearner(Y = y,  X= x, 
+                      method = "method.NNLS",
+                      SL.library = sl.lib)
 
 
 # EXPORT =======================================================================
@@ -788,6 +804,7 @@ kaggle$y_20 <- ifelse (kaggle$year == "2020", 1, 0)
 
 kaggle$y_21 <- rep(0,nrow(kaggle))
 kaggle$y_21 <- ifelse (kaggle$year == "2021", 1, 0)
+
 
 export <- as.data.frame(kaggle$property_id)
 export$price <- predict(model.4, newdata = kaggle)
